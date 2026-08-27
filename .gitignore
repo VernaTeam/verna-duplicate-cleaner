@@ -1,0 +1,27 @@
+# Build output. The executable ships as a GitHub Release asset, not in the tree.
+build/
+dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+env/
+
+# Created at runtime next to the app
+settings.json
+logs/
+
+# Local continuation notes — kept on disk, deliberately not published
+HANDOFF.md
+
+# Backups and editor/OS noise
+*.bak
+*.bak-*
+*.orig
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
