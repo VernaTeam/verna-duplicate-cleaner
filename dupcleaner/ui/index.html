@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Duplicate Cleaner</title>
+<style>/*__STYLE__*/</style>
+</head>
+<body>
+
+<div id="drop" class="dropzone"><div class="dropzone-inner" data-i18n="folders.drop"></div></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="4" width="13" height="16" rx="3" class="lg-back"/>
+      <rect x="6" y="2" width="13" height="16" rx="3" class="lg-front"/>
+      <circle cx="11" cy="13" r="2.1" class="lg-note"/>
+      <circle cx="16" cy="11.6" r="2.1" class="lg-note"/>
+      <path d="M13.1 13V7.2l5-1.1V11.6" class="lg-stem"/>
+    </svg>
+    <div class="brand-text">
+      <strong data-i18n="app.title"></strong>
+      <span data-i18n="app.tagline"></span>
+    </div>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="seg" id="langSeg" role="group">
+      <button data-lang="fa">فارسی</button>
+      <button data-lang="en">English</button>
+    </div>
+    <div class="seg" id="themeSeg" role="group">
+      <button data-theme-choice="light" title="" data-i18n-title="ui.theme.light">
+        <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+      </button>
+      <button data-theme-choice="dark" title="" data-i18n-title="ui.theme.dark">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+      </button>
+      <button data-theme-choice="system" title="" data-i18n-title="ui.theme.system">
+        <svg viewBox="0 0 24 24" class="ic"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 20h8"/></svg>
+      </button>
+    </div>
+    <button class="icon-btn" id="settingsBtn" data-i18n-title="ui.settings">
+      <svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- ─────────────── setup column ─────────────── -->
+  <section class="panel setup" id="setupPanel">
+    <div class="panel-head">
+      <h2 data-i18n="folders.title"></h2>
+      <span class="chip" id="folderCount"></span>
+    </div>
+
+    <ul class="folder-list" id="folderList"></ul>
+    <p class="empty-hint" id="folderEmpty" data-i18n="folders.empty"></p>
+
+    <div class="row gap">
+      <button class="btn primary-soft" id="addFolder">
+        <svg viewBox="0 0 24 24" class="ic"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+        <span data-i18n="folders.add"></span>
+      </button>
+      <button class="btn ghost" id="clearFolders" data-i18n="folders.clear"></button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title" data-i18n="opt.what"></h2>
+    <div class="radio-group" id="modeGroup">
+      <label class="radio"><input type="radio" name="mode" value="audio" checked><span data-i18n="opt.mode.audio"></span></label>
+      <label class="radio"><input type="radio" name="mode" value="all"><span data-i18n="opt.mode.all"></span></label>
+      <label class="radio"><input type="radio" name="mode" value="custom"><span data-i18n="opt.mode.custom"></span></label>
+    </div>
+    <input type="text" class="input" id="customExts" data-i18n-ph="opt.custom.placeholder" disabled>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title" data-i18n="opt.methods"></h2>
+    <div class="method-list" id="methodList"></div>
+
+    <div class="divider"></div>
+
+    <details class="advanced" id="advanced">
+      <summary data-i18n="opt.advanced"></summary>
+      <div class="field">
+        <label data-i18n="opt.minsize"></label>
+        <div class="field-input">
+          <input type="number" class="input small" id="minSize" min="0" value="64">
+          <span class="unit" data-i18n="opt.kb"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="opt.tolerance"></label>
+        <div class="field-input">
+          <span class="unit">±</span>
+          <input type="number" class="input small" id="tolerance" min="0" step="0.5" value="2">
+          <span class="unit" data-i18n="opt.percent"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="opt.workers"></label>
+        <div class="field-input">
+          <input type="number" class="input small" id="workers" min="1" max="32" value="8">
+        </div>
+      </div>
+      <p class="hint" data-i18n="opt.workers.hint"></p>
+      <label class="check"><input type="checkbox" id="recursive" checked><span data-i18n="opt.recursive"></span></label>
+      <label class="check"><input type="checkbox" id="skipHidden" checked><span data-i18n="opt.hidden"></span></label>
+      <label class="check"><input type="checkbox" id="useCache" checked><span data-i18n="opt.cache"></span></label>
+    </details>
+  </section>
+
+  <!-- ─────────────── results column ─────────────── -->
+  <section class="panel results">
+    <div class="scanbar">
+      <button class="btn accent lg" id="scanBtn">
+        <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+        <span data-i18n="scan.start"></span>
+      </button>
+      <button class="btn danger-soft" id="stopBtn" disabled data-i18n="scan.stop"></button>
+      <div class="progress-wrap">
+        <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="progress-text"><span id="phaseText"></span><span id="etaText" class="eta"></span></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" class="ic"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+        <input type="text" id="search" data-i18n-ph="res.search">
+      </div>
+      <select class="input select" id="confFilter">
+        <option value="all" data-i18n="res.filter.all"></option>
+        <option value="sure" data-i18n="res.filter.sure"></option>
+        <option value="trusted" data-i18n="res.filter.trusted"></option>
+        <option value="weak" data-i18n="res.filter.weak"></option>
+      </select>
+
+      <div class="dropdown" id="colDrop">
+        <button class="btn ghost" id="colBtn">
+          <svg viewBox="0 0 24 24" class="ic"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+          <span data-i18n="res.columns"></span>
+        </button>
+        <div class="dropdown-menu" id="colMenu">
+          <p class="menu-hint" data-i18n="res.columns.hint"></p>
+          <div id="colToggles"></div>
+        </div>
+      </div>
+
+      <span class="spacer"></span>
+      <span class="muted" id="showing"></span>
+    </div>
+
+    <div class="table-scroll" id="tableScroll">
+      <table class="grid" id="grid">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
+      <div class="placeholder" id="placeholder" data-i18n="res.noscan"></div>
+    </div>
+
+    <div class="actionbar">
+      <div class="row gap wrap">
+        <button class="btn ghost" id="autoBtn" data-i18n="act.auto"></button>
+        <select class="input select narrow" id="autoLevel">
+          <option value="95" data-i18n="act.auto.sure"></option>
+          <option value="70" selected data-i18n="act.auto.trusted"></option>
+          <option value="0" data-i18n="act.auto.all"></option>
+        </select>
+        <button class="btn ghost" id="clearSel" data-i18n="act.clear"></button>
+        <button class="btn ghost" id="expandAll" data-i18n="act.expand"></button>
+        <button class="btn ghost" id="collapseAll" data-i18n="act.collapse"></button>
+        <button class="btn ghost" id="exportBtn" data-i18n="act.export"></button>
+      </div>
+      <div class="row gap">
+        <label class="check"><input type="checkbox" id="toTrash" checked><span data-i18n="act.trash"></span></label>
+        <button class="btn danger" id="deleteBtn" disabled data-i18n="act.delete"></button>
+      </div>
+    </div>
+
+    <div class="statusbar" id="status"></div>
+  </section>
+</main>
+
+<!-- context menu -->
+<div class="ctx" id="ctx">
+  <button data-act="play" data-i18n="act.play"></button>
+  <button data-act="reveal" data-i18n="act.reveal"></button>
+  <button data-act="copy" data-i18n="act.copypath"></button>
+  <div class="ctx-sep"></div>
+  <button data-act="keeponly" data-i18n="act.keeponly"></button>
+  <button data-act="keep" data-i18n="act.markkeep"></button>
+  <button data-act="drop" data-i18n="act.markdrop"></button>
+  <div class="ctx-sep"></div>
+  <button data-act="wholegroup" class="warn" data-i18n="act.wholegroup"></button>
+</div>
+
+<!-- settings sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<aside class="sheet" id="sheet">
+  <div class="sheet-head">
+    <h2 data-i18n="ui.settings"></h2>
+    <button class="icon-btn" id="sheetClose">
+      <svg viewBox="0 0 24 24" class="ic"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="sheet-body">
+    <h3 data-i18n="ui.cache.title"></h3>
+    <p class="muted" id="cacheInfo"></p>
+    <button class="btn ghost" id="clearCache" data-i18n="ui.cache.clear"></button>
+    <div class="divider"></div>
+    <h3 data-i18n="ui.about"></h3>
+    <p class="muted" id="aboutText"></p>
+    <p class="muted" id="warnText"></p>
+  </div>
+</aside>
+
+<div class="toast" id="toast"></div>
+
+<script>/*__I18N__*/</script>
+<script>/*__APP__*/</script>
+</body>
+</html>

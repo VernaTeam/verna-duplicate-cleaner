@@ -13,6 +13,7 @@ env/
 # Created at runtime next to the app
 settings.json
 logs/
+cache/
 
 # Local continuation notes — kept on disk, deliberately not published
 HANDOFF.md

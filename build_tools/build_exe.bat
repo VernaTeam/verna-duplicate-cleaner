@@ -6,17 +6,17 @@ cd /d "%~dp0.."
 set "PYEXE="
 for %%V in (3.12 3.13 3.11 3.10 3) do (
     if not defined PYEXE (
-        py -%%V -c "import tkinter" >nul 2>&1 && set "PYEXE=py -%%V"
+        py -%%V -c "import sqlite3" >nul 2>&1 && set "PYEXE=py -%%V"
     )
 )
 if not defined PYEXE (
-    echo Python with tkinter was not found.
+    echo Python 3.10 or newer was not found.
     pause
     exit /b 1
 )
 
 echo [1/4] Installing build dependencies...
-%PYEXE% -m pip install --quiet --upgrade pyinstaller mutagen send2trash pillow || goto :fail
+%PYEXE% -m pip install --quiet --upgrade pyinstaller pywebview mutagen send2trash pillow || goto :fail
 
 echo [2/4] Generating icon...
 %PYEXE% build_tools\make_icon.py || goto :fail
@@ -34,5 +34,7 @@ exit /b 0
 :fail
 echo.
 echo BUILD FAILED - see the messages above.
+echo If it says PermissionError, close any running DuplicateCleaner.exe
+echo and delete dist\DuplicateCleaner.exe before retrying.
 pause
 exit /b 1

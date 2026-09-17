@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""حذف‌کنندهٔ فایل‌های تکراری — هستهٔ برنامه."""
+"""Duplicate Cleaner — find duplicate files, music especially."""
 
-__version__ = "1.0.0"
-__app_name__ = "حذف‌کنندهٔ فایل تکراری"
+__version__ = "2.0.0"
+__app_name__ = "Duplicate Cleaner"

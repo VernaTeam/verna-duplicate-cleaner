@@ -1,17 +1,20 @@
 # -*- coding: utf-8 -*-
-"""ابزارهای عمومی: نرمال‌سازی متن فارسی، نمایش حجم و زمان، مسیرهای طولانی ویندوز."""
+"""Text normalization, locale-aware formatting, and Windows long-path support."""
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 import re
 import unicodedata
 
-# ---------------------------------------------------------------- متن فارسی
+from .jalali import gregorian_to_jalali
 
-# حروف عربی که باید به معادل فارسی تبدیل شوند
+# --------------------------------------------------------------- Persian text
+
+# Arabic letter forms folded to their Persian equivalents
 _AR_TO_FA = str.maketrans({
-    "ي": "ی", "ﻱ": "ی", "ﻲ": "ی", "ی": "ی",
+    "ي": "ی", "ﻱ": "ی", "ﻲ": "ی",
     "ك": "ک", "ﻙ": "ک", "ﻚ": "ک",
     "ة": "ه", "ۀ": "ه",
     "أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا",
@@ -19,19 +22,19 @@ _AR_TO_FA = str.maketrans({
     "ٲ": "ا", "ٳ": "ا",
 })
 
-# ارقام فارسی و عربی -> لاتین
+# Persian and Arabic-Indic digits to Latin
 _DIGITS_TO_EN = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
-# ارقام لاتین -> فارسی (فقط برای نمایش در رابط کاربری)
+# Latin digits to Persian, for display only
 _DIGITS_TO_FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
-# نویسه‌های نامرئی: نیم‌فاصله، کنترل جهت، اعراب
+# zero-width joiners, bidi controls and diacritics
 _INVISIBLE = re.compile(
-    "[​‌‍‎‏‪-‮⁦-⁩﻿"
-    "ً-ٰٟۖ-ۭ]"
+    "[\u200b\u200c\u200d\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff"
+    "\u064b-\u0670\u06d6-\u06ed]"
 )
 
-# عبارت‌هایی که در نام آهنگ‌های دانلودی زیاد دیده می‌شوند و معنایی ندارند
+# Filler that shows up in downloaded track names and carries no meaning
 _NOISE = [
     r"\bofficial\s*(music\s*)?(video|audio|lyrics?|visualizer)\b",
     r"\blyrics?\b",
@@ -50,30 +53,33 @@ _NOISE = [
 ]
 _NOISE_RE = re.compile("|".join(_NOISE), re.IGNORECASE)
 
-# نشانه‌های «کپی» در نام فایل
+# "copy" markers at the end of a file name
 _COPY_MARKS = [
-    r"\(\s*\d{1,3}\s*\)\s*$",          # song (1)
-    r"\[\s*\d{1,3}\s*\]\s*$",          # song [1]
+    r"\(\s*\d{1,3}\s*\)\s*$",
+    r"\[\s*\d{1,3}\s*\]\s*$",
     r"[-–_\s]+copy(\s*\(\s*\d+\s*\))?\s*$",
     r"\bcopy\s*of\b",
     r"[-–_\s]+کپی(\s*\(?\s*\d*\s*\)?)?\s*$",
     r"[-–_\s]+نسخه\s*\d*\s*$",
     r"[-–_\s]+duplicate\s*$",
-    r"\s*-\s*نسخه\s*کپی\s*$",
 ]
 _COPY_RE = re.compile("|".join(_COPY_MARKS), re.IGNORECASE)
 
-_PUNCT_RE = re.compile(r"[^\w\s؀-ۿ]+", re.UNICODE)
+_PUNCT_RE = re.compile(r"[^\w\s\u0600-\u06ff]+", re.UNICODE)
 _SPACE_RE = re.compile(r"\s+")
 
 
 def fa_digits(text) -> str:
-    """ارقام لاتین را برای نمایش به فارسی تبدیل می‌کند."""
+    """Latin digits to Persian, for display."""
     return str(text).translate(_DIGITS_TO_FA)
 
 
+def localize_digits(text, lang: str) -> str:
+    return fa_digits(text) if lang == "fa" else str(text)
+
+
 def normalize_text(s: str) -> str:
-    """متن را برای مقایسه یکدست می‌کند (عربی/فارسی، اعراب، ارقام، فاصله)."""
+    """Fold a string for comparison: letter forms, diacritics, digits, spacing."""
     if not s:
         return ""
     s = unicodedata.normalize("NFKC", s)
@@ -88,7 +94,6 @@ def normalize_text(s: str) -> str:
 
 
 def strip_copy_marks(stem: str) -> str:
-    """نشانه‌های «کپی»/«(۱)» را از انتهای نام فایل حذف می‌کند."""
     prev = None
     out = stem
     while prev != out:
@@ -98,51 +103,116 @@ def strip_copy_marks(stem: str) -> str:
 
 
 def looks_like_copy(stem: str) -> bool:
-    """آیا نام فایل نشانهٔ کپی بودن دارد؟"""
     return bool(_COPY_RE.search(stem)) or "copy" in stem.casefold() or "کپی" in stem
 
 
 def name_key(filename: str) -> str:
-    """کلید مقایسهٔ نام فایل، بدون پسوند و بدون نشانه‌های کپی."""
+    """Comparison key for a file name: no extension, no copy markers."""
     stem = os.path.splitext(filename)[0]
     stem = strip_copy_marks(stem)
     return normalize_text(stem)
 
 
-# ---------------------------------------------------------------- نمایش
+# ---------------------------------------------------------------- formatting
 
-_UNITS = ["بایت", "کیلوبایت", "مگابایت", "گیگابایت", "ترابایت"]
+_UNITS = {
+    "fa": ["بایت", "کیلوبایت", "مگابایت", "گیگابایت", "ترابایت"],
+    "en": ["B", "KB", "MB", "GB", "TB"],
+}
 
 
-def human_size(n: int, persian: bool = True) -> str:
-    """حجم را به صورت خوانا برمی‌گرداند."""
+def human_size(n: int | None, lang: str = "fa") -> str:
     if n is None:
-        return "-"
+        return "—"
+    units = _UNITS.get(lang, _UNITS["en"])
     value = float(n)
     idx = 0
-    while value >= 1024 and idx < len(_UNITS) - 1:
+    while value >= 1024 and idx < len(units) - 1:
         value /= 1024.0
         idx += 1
     text = f"{value:.0f}" if idx == 0 or value >= 100 else f"{value:.1f}"
-    text = f"{text} {_UNITS[idx]}"
-    return fa_digits(text) if persian else text
+    if lang == "fa":
+        # Persian uses the Arabic decimal separator
+        return fa_digits(text).replace(".", "٫") + " " + units[idx]
+    return f"{text} {units[idx]}"
 
 
-def human_duration(seconds: float | None, persian: bool = True) -> str:
-    """مدت زمان را به شکل m:ss یا h:mm:ss برمی‌گرداند."""
+def human_duration(seconds: float | None, lang: str = "fa") -> str:
     if not seconds or seconds <= 0:
-        return "-"
+        return "—"
     total = int(round(seconds))
     h, rem = divmod(total, 3600)
     m, s = divmod(rem, 60)
     text = f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-    return fa_digits(text) if persian else text
+    return fa_digits(text) if lang == "fa" else text
 
 
-# ---------------------------------------------------------------- مسیر ویندوز
+def human_bitrate(bits: int | None, lang: str = "fa") -> str:
+    if not bits:
+        return "—"
+    kbps = int(bits) // 1000
+    return f"{fa_digits(kbps)} kbps" if lang == "fa" else f"{kbps} kbps"
+
+
+def format_date(timestamp: float, lang: str = "fa") -> str:
+    """Jalali with Persian digits in Persian, ISO in English."""
+    try:
+        when = _dt.datetime.fromtimestamp(timestamp)
+    except (OSError, OverflowError, ValueError):
+        return "—"
+    if lang == "fa":
+        jy, jm, jd = gregorian_to_jalali(when.year, when.month, when.day)
+        return fa_digits(f"{jy}/{jm:02d}/{jd:02d}")
+    return when.strftime("%Y-%m-%d")
+
+
+def format_datetime(timestamp: float, lang: str = "fa") -> str:
+    try:
+        when = _dt.datetime.fromtimestamp(timestamp)
+    except (OSError, OverflowError, ValueError):
+        return "—"
+    if lang == "fa":
+        jy, jm, jd = gregorian_to_jalali(when.year, when.month, when.day)
+        return fa_digits(f"{jy}/{jm:02d}/{jd:02d} {when:%H:%M}")
+    return when.strftime("%Y-%m-%d %H:%M")
+
+
+def human_eta(seconds: float | None, lang: str = "fa") -> str:
+    """Rough remaining time, rounded to something a person would say."""
+    if not seconds or seconds <= 0:
+        return ""
+    total = int(seconds)
+    if total < 60:
+        n = max(5, (total // 5) * 5)
+        return f"{fa_digits(n)} ثانیه" if lang == "fa" else f"{n} seconds"
+    if total < 3600:
+        n = max(1, round(total / 60))
+        return f"{fa_digits(n)} دقیقه" if lang == "fa" else (
+            "1 minute" if n == 1 else f"{n} minutes")
+    n = round(total / 3600, 1)
+    text = f"{n:g}"
+    return f"{fa_digits(text)} ساعت" if lang == "fa" else f"{text} hours"
+
+
+# ------------------------------------------------------------ Windows paths
+
+def short_folder(folder: str, segments: int = 2) -> str:
+    """Last few path segments, e.g. "…\\MusicDemo\\Unsorted".
+
+    Shortening in Python rather than clipping with CSS keeps the column narrow
+    and reads the same in both text directions — an LTR path truncated inside
+    an RTL table otherwise hides whichever end the browser feels like.
+    """
+    if not folder:
+        return ""
+    parts = [p for p in folder.replace("/", "\\").split("\\") if p]
+    if len(parts) <= segments:
+        return folder
+    return "…\\" + "\\".join(parts[-segments:])
+
 
 def long_path(path: str) -> str:
-    """برای مسیرهای بلندتر از حد ویندوز، پیشوند \\\\?\\ اضافه می‌کند."""
+    r"""Prefix \\?\ for paths past the Windows MAX_PATH limit."""
     if os.name != "nt":
         return path
     if len(path) < 240 or path.startswith("\\\\?\\"):
@@ -151,11 +221,3 @@ def long_path(path: str) -> str:
     if abs_path.startswith("\\\\"):
         return "\\\\?\\UNC" + abs_path[1:]
     return "\\\\?\\" + abs_path
-
-
-def short_folder(path: str, max_len: int = 60) -> str:
-    """مسیر پوشه را برای نمایش کوتاه می‌کند."""
-    folder = os.path.dirname(path)
-    if len(folder) <= max_len:
-        return folder
-    return folder[:20] + " … " + folder[-(max_len - 23):]

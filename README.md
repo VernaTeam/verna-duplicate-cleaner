@@ -33,6 +33,7 @@ file, which one found it.
 
 <div align="center">
 <img src="docs/screenshot.png" width="900" alt="Scan results grouped by confidence">
+<br><em>Persian, dark. The app is fully bilingual — <a href="docs/screenshot-en.png">English, light</a>.</em>
 </div>
 
 ---
@@ -88,8 +89,8 @@ zero-width non-joiners, diacritics and bidi control characters; and filler like
 
 ### Confidence is the weakest link, not the strongest
 
-If a group was built by more than one method it is labelled `‹ترکیبی›`
-(combined), and its percentage is that of the **weakest** connection in it.
+If a group was built by more than one method it is labelled *combined*, and its
+percentage is that of the **weakest** connection in it.
 
 Three files that are byte-identical plus a fourth that joined only by matching
 tags is an **85%** group, not a 100% one — because that fourth file is not
@@ -115,7 +116,7 @@ small consecutive differences cannot snowball into one enormous group.
 `Auto-select` keeps one file per group and marks the rest, scoring in this
 order: name shows no copy marker → not sitting in a temp/download folder →
 higher bitrate → more complete tags → has cover art → larger → shallower path
-and older file.
+and older file. The survivor is marked with a star.
 
 Low-confidence groups are **left untouched by default** (threshold 70%,
 adjustable). A 40% size-only match is a guess, and pre-ticking guesses is how
@@ -133,10 +134,36 @@ accidents happen.
   `System Volume Information`, `AppData`, …) are never scanned.
 - Hidden and system files are skipped by default.
 
+## The interface
+
+- **Persian and English**, switched instantly — both dictionaries live in the
+  page, so nothing reloads. Dates follow the language: Jalali with Persian
+  digits in Persian, ISO in English.
+- **Dark, light, or match Windows.**
+- **Show or hide any column.** Ten are available; six are on by default so each
+  one stays wide enough to read. Click a header to sort.
+- **Drag folders onto the window** to add them.
+- Vazirmatn is embedded in the page, so Persian looks the same on any machine.
+
+## Speed
+
+Two things keep a large library manageable:
+
+- **A cache.** Hashes, audio ranges and tags are stored in SQLite keyed by
+  path, size and modification time. Re-scanning the same folder skips
+  everything that has not changed — in testing, a second pass ran roughly 70×
+  faster. Any edit to a file invalidates just that row. Clear it from Settings.
+- **Parallel tag reading.** Tag and container parsing run in a thread pool
+  (8 workers by default, adjustable — use fewer on a spinning disk).
+
+Neither changes what the scan finds; that is checked by a test which runs the
+same library with the cache on and off, and with one worker and eight.
+
 ## Running it
 
 **From a release** — download `DuplicateCleaner.exe` and run it. Single file,
-no installer, no Python required.
+no installer, no Python. Needs the Microsoft Edge WebView2 runtime, which is
+already present on Windows 10 and 11.
 
 **From source** — Windows, Python 3.10+ (developed on 3.12):
 
@@ -148,8 +175,8 @@ python run.pyw
 Or double-click `اجرا.bat`, which finds a working interpreter and installs the
 dependencies if they are missing.
 
-Both dependencies are optional. Without `mutagen` the tag and duration
-detectors switch off and the app says so at startup; without `send2trash` the
+`mutagen` and `send2trash` are optional: without the first, the tag and
+duration detectors switch off and the app says so; without the second, the
 Recycle Bin option is unavailable.
 
 ## Building the executable
@@ -158,54 +185,75 @@ Recycle Bin option is unavailable.
 build_tools/build_exe.bat
 ```
 
-Produces `dist/DuplicateCleaner.exe` — about 10 MB, one file, no console
+Produces `dist/DuplicateCleaner.exe` — about 15 MB, one file, no console
 window. The icon is drawn by `build_tools/make_icon.py` with Pillow, so there
 is no binary image asset to keep in sync.
 
 > If the build fails with `PermissionError`, a previous copy of the executable
-> is still running or locked. Close it and delete `dist/DuplicateCleaner.exe`
-> before rebuilding.
+> is still running. Close it and delete `dist/DuplicateCleaner.exe` first.
 
 ## Layout
 
 | Path | Responsibility |
 |---|---|
-| `run.pyw` | Entry point (`.pyw`, so no console window appears) |
+| `run.pyw` | Entry point |
 | `dupcleaner/scanner.py` | Scan engine: walking, the seven detectors, grouping |
 | `dupcleaner/audio.py` | Tag reading and locating the audio byte range |
-| `dupcleaner/hashing.py` | blake2b over a byte range, plus a cheap pre-filter signature |
+| `dupcleaner/hashing.py` | blake2b over a byte range, plus a cheap pre-filter |
+| `dupcleaner/cache.py` | SQLite cache of hashes, tags and audio ranges |
 | `dupcleaner/keeper.py` | "Best copy" scoring, safe deletion, CSV report |
-| `dupcleaner/util.py` | Persian normalization, size/duration formatting, long paths |
-| `dupcleaner/gui.py` | The tkinter interface |
+| `dupcleaner/util.py` | Persian normalization, locale-aware formatting |
+| `dupcleaner/jalali.py` | Gregorian → Jalali conversion, dependency-free |
+| `dupcleaner/i18n.py` | Every string, in both languages |
+| `dupcleaner/webapp.py` | The window: pywebview + WebView2, and the JS bridge |
+| `dupcleaner/ui/` | index.html, style.css, app.js, Vazirmatn |
 | `build_tools/` | Icon generation and PyInstaller configuration |
+
+The window is an HTML page rendered by WebView2 through pywebview. Version 1
+used tkinter; it could not align Persian mixed with Latin, and this table is
+nothing but that — Latin file names and paths, `320 kbps`, Persian titles and
+Persian-digit sizes, all in one row.
 
 ## Working with the results table
 
 | Action | How |
 |---|---|
-| Mark one file for deletion | Click the `حذف؟` column, or press `Space` |
-| Mark a whole group | Click that column on the group row |
-| Play a file | Double-click its name |
-| Show it in Explorer | Right-click → open file location |
+| Mark one file for deletion | Click its checkbox |
+| Mark a whole group | Click the checkbox on the group row |
+| Collapse a group | Click the group row |
+| Play a file | Double-click it |
+| Show it in Explorer | Right-click → show in Explorer |
 | Keep only this one | Right-click → keep only this |
-| Filter by confidence | The `نمایش` dropdown above the table |
-| Search results | Searches name, path, artist, title and album |
-| Export a report | `ذخیرهٔ گزارش` — CSV in UTF-8 with BOM, so Excel reads Persian |
+| Sort | Click any column header |
+| Filter by confidence | The dropdown above the table |
+| Search | Matches name, path, artist, title and album |
+| Re-scan | `F5` |
+| Export a report | `Save report` — CSV in UTF-8 with BOM, so Excel reads Persian |
 
 ## Notes on correctness
 
-The engine was tested against a generated library built with ffmpeg covering
-every detector, plus deliberate near-misses that must *not* group. Deletion was
+The engine is tested against a generated library built with ffmpeg that covers
+every detector, plus deliberate near-misses that must *not* group. Deletion is
 tested for the Recycle Bin, permanent removal, Persian filenames, locked files
-and missing files; the scanner was tested against corrupt MP3s, zero-byte
-files, empty and nonexistent folders, the same folder supplied twice, and
-cancellation mid-scan.
+and missing files; the scanner against corrupt MP3s, zero-byte files, empty and
+nonexistent folders, the same folder supplied twice, and cancellation mid-scan.
+The interface has its own suite of 21 checks driven through the real page,
+covering column toggling, sorting, search, filtering, the survivor guard,
+the auto-select threshold, language and theme switching, settings persistence
+and an actual deletion.
 
 Not implemented: acoustic fingerprinting. The same song from a different encode
 or source is caught by tags, name or duration, but never by hash. Adding it
 would mean shipping an external binary such as `fpcalc`, so it would have to be
 optional.
 
+## Credits
+
+The interface embeds [Vazirmatn](https://github.com/rastikerdar/vazirmatn)
+by Saber Rastikerdar, licensed under the SIL Open Font License 1.1 — the
+licence travels with the font in
+[`dupcleaner/ui/fonts/OFL.txt`](dupcleaner/ui/fonts/OFL.txt).
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The bundled font keeps its own licence.

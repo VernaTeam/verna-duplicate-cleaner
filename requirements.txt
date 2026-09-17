@@ -1,4 +1,7 @@
-# Both are optional: the app starts and scans without them, but degraded.
+# Required: the window itself is an HTML page rendered by WebView2.
+pywebview>=6.0     # needs pythonnet, which pip pulls in on Windows
+
+# Optional: the app runs without these, with fewer abilities.
 mutagen>=1.47      # reads music tags; without it the tag/duration methods are off
 send2trash>=1.8    # moves deletions to the Recycle Bin instead of erasing them
 
