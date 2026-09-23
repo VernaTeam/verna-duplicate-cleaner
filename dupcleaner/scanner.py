@@ -6,7 +6,9 @@ method that actually found it:
 
   100%  exact     byte-for-byte identical
    98%  audio     identical audio bytes, only the tags differ
-   85%  tag       same artist and title
+   92%  tag       same artist and title
+   90%  feat      same title once the guest credit is removed, credited
+                  artists compatible, and the durations agree
    72%  title     same title, artist field empty
    70%  name      same file name after normalization
    58%  duration  near-identical duration and size (untagged, badly named files)
@@ -34,7 +36,8 @@ from .util import long_path, name_key
 METHODS = {
     "exact": 100,
     "audio": 98,
-    "tag": 85,
+    "tag": 92,
+    "feat": 90,
     "title": 72,
     "name": 70,
     "duration": 58,
@@ -153,6 +156,7 @@ class ScanOptions:
     use_exact: bool = True
     use_audio_hash: bool = True
     use_tags: bool = True
+    use_feat: bool = True
     use_name: bool = True
     use_duration: bool = True
     use_size: bool = True
@@ -166,7 +170,8 @@ class ScanOptions:
 
     def any_method(self) -> bool:
         return any([self.use_exact, self.use_audio_hash, self.use_tags,
-                    self.use_name, self.use_duration, self.use_size])
+                    self.use_feat, self.use_name, self.use_duration,
+                    self.use_size])
 
 
 class Cancelled(Exception):
@@ -500,19 +505,82 @@ class Engine:
 
     # ----------------------------------------- detectors 3 and 4: the tags
 
+    # A bucket bigger than this is skipped: a title shared by that many files
+    # is a generic one and says nothing, and the artist check below is
+    # quadratic inside a bucket.
+    MAX_TITLE_BUCKET = 60
+
+    # Two copies of one recording never differ by more than a rounding error.
+    # A radio edit against an album version does, and must not be called a
+    # 90% match.
+    FEAT_DURATION_WINDOW = 2.5
+
     def detect_tags(self):
-        self._tick("scan.tags", 0, 2)
+        self._tick("scan.tags", 0, 3)
         for indices in self._bucket_by(
                 lambda f: f.meta.tag_key() if (f.meta and f.is_audio) else "").values():
             self._apply_bucket(indices, "tag")
 
-        self._tick("scan.tags", 1, 2)
+        self._tick("scan.tags", 1, 3)
+        if self.opt.use_feat:
+            self.detect_featuring()
+
+        self._tick("scan.tags", 2, 3)
         # same title, artist field empty
         for indices in self._bucket_by(
                 lambda f: f.meta.title_key()
                 if (f.meta and f.is_audio and not f.meta.tag_key()) else "").values():
             self._apply_bucket(indices, "title")
-        self._tick("scan.tags", 2, 2)
+        self._tick("scan.tags", 3, 3)
+
+    # ------------------------------- detector 4: the guest-artist credit
+
+    def _feat_compatible(self, i: int, j: int) -> bool:
+        """Same recording, described differently?
+
+        Requires the credited artists of one file to be a subset of the
+        other's — so "Shayea" matches "Shayea & Daniyal & Mahyar" but
+        "Song (feat. A)" never matches "Song (feat. B)" — and, when both
+        durations are known, that the two lengths agree.
+        """
+        a, b = self.files[i].meta, self.files[j].meta
+        artists_a, artists_b = a.artist_set(), b.artist_set()
+        if not (artists_a <= artists_b or artists_b <= artists_a):
+            return False
+        if a.duration and b.duration:
+            return abs(a.duration - b.duration) <= self.FEAT_DURATION_WINDOW
+        return True
+
+    def detect_featuring(self):
+        """Same song, different guest-artist bookkeeping.
+
+        "Ta Yeja (feat. Daniyal & Mahyar)" credited to "Shayea & Daniyal &
+        Mahyar", and "Ta Yeja (Ft. Daniyal & Mahyar)" credited to "Shayea",
+        are one recording — but comparing artist+title as strings says they
+        are unrelated, and the file falls through to the weak size and
+        duration detectors. Strip the guest credit from the title, then
+        compare the credited artists as sets.
+        """
+        buckets = self._bucket_by(
+            lambda f: f.meta.core_title_key()
+            if (f.meta and f.is_audio and f.meta.artist_set()) else "")
+
+        for indices in buckets.values():
+            self._check()
+            if len(indices) > self.MAX_TITLE_BUCKET:
+                continue
+            claimed: set = set()
+            for position, i in enumerate(indices):
+                if i in claimed:
+                    continue
+                cluster = [i]
+                for j in indices[position + 1:]:
+                    if j not in claimed and self._feat_compatible(i, j):
+                        cluster.append(j)
+                        claimed.add(j)
+                if len(cluster) > 1:
+                    claimed.add(i)
+                    self._apply_bucket(cluster, "feat")
 
     # ------------------------------------------- detector 5: the file name
 

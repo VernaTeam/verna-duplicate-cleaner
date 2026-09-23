@@ -28,8 +28,12 @@ constantly:
   Arabic-Indic digits against Latin ones, a zero-width non-joiner here but not
   there. Two identical titles compare as different strings.
 
-This tool attacks the problem from seven directions at once and tells you, per
-file, which one found it.
+- The same guest artist is written three ways. `Ta Yeja (feat. Daniyal &
+  Mahyar)` by "Shayea & Daniyal & Mahyar" and `Ta Yeja (Ft. Daniyal &
+  Mahyar)` by "Shayea" are one recording, and no string comparison says so.
+
+This tool attacks the problem from eight directions at once and tells you,
+per file, which one found it.
 
 <div align="center">
 <img src="docs/screenshot.png" width="900" alt="Scan results grouped by confidence">
@@ -66,7 +70,7 @@ Anything else falls back to hashing the whole file.
 
 ## How it decides
 
-Seven detectors run strongest first. Each file is claimed by the strongest
+Eight detectors run strongest first. Each file is claimed by the strongest
 method that found it, and the results table shows that method per file — so a
 group is never a black box.
 
@@ -74,11 +78,29 @@ group is never a black box.
 |---|---|---|
 | 100% | Identical content | blake2b over the whole file; byte-for-byte identical |
 | 98% | Same audio, different tags | the tag-stripped audio range described above |
-| 85% | Music tags | artist + title, after Persian normalization |
+| 92% | Music tags | artist + title, after Persian normalization |
+| 90% | Guest credits differ | same title once `feat.`/`Ft.` is removed, credited artists compatible, lengths agree |
 | 72% | Title only | when the artist field is empty |
 | 70% | File name | name after stripping `Copy`, `(1)`, `[320]`, site names |
 | 58% | Duration + size | for untagged, badly named files: ±1.5 s and ±25% |
 | 40% | Size only | last resort, within your tolerance — flagged as suspect |
+
+### Guest artists, written three different ways
+
+A credit like `feat.` is the single most common reason two copies of one song
+disagree, and it goes wrong in two places at once: the title says `feat.` in
+one file and `Ft.` in the other, and the artist field lists `Shayea` against
+`Shayea & Daniyal & Mahyar`.
+
+So the title is compared with the credit stripped, and the artist fields are
+compared **as sets**: a match needs one file's credited artists to be a subset
+of the other's. That accepts `Shayea` against `Shayea & Daniyal & Mahyar`, and
+rejects `Song (feat. A)` against `Song (feat. B)`, where the guests genuinely
+differ. The two lengths must also agree within 2.5 seconds, so a radio edit is
+never called a 90% match of the album version.
+
+Splitting on `and` or a bare `x` would tear apart real band names, so neither
+is treated as a separator — `Florence and the Machine` stays one artist.
 
 ### Persian normalization
 

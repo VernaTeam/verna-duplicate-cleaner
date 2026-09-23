@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from .util import long_path, normalize_text
+from .util import artist_tokens, core_title_key, long_path, normalize_text
 
 try:
     import mutagen
@@ -64,9 +64,18 @@ class AudioMeta:
         return f"{a}|{t}" if a else ""
 
     def title_key(self) -> str:
-        """کلید مقایسه فقط بر اساس عنوان (وقتی آرتیست خالی است)."""
+        """Comparison key on the title alone, for when the artist is empty."""
         t = normalize_text(self.title)
         return t if len(t) >= 3 else ""
+
+    def core_title_key(self) -> str:
+        """Title with any guest-artist credit removed."""
+        t = core_title_key(self.title)
+        return t if len(t) >= 3 else ""
+
+    def artist_set(self) -> frozenset:
+        """Everyone credited on this file, as a set."""
+        return artist_tokens(self.artist)
 
 
 _EASY_KEYS = {

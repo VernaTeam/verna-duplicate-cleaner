@@ -176,6 +176,7 @@ class Api:
             use_exact=bool(methods.get("exact", True)),
             use_audio_hash=bool(methods.get("audio", True)),
             use_tags=bool(methods.get("tag", True)),
+            use_feat=bool(methods.get("feat", True)),
             use_name=bool(methods.get("name", True)),
             use_duration=bool(methods.get("duration", True)),
             use_size=bool(methods.get("size", True)),

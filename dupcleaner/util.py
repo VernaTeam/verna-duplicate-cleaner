@@ -65,6 +65,22 @@ _COPY_MARKS = [
 ]
 _COPY_RE = re.compile("|".join(_COPY_MARKS), re.IGNORECASE)
 
+# "feat." and its dozen spellings. A guest-artist credit is the single most
+# common reason two copies of one song disagree: one file says
+# "Ta Yeja (feat. Daniyal & Mahyar)" and the other "Ta Yeja (Ft. Daniyal &
+# Mahyar)", with artist fields that list different subsets of the same people.
+_FEAT_WORDS = r"feat|ft|featuring|with|w/|\u0628\u0627\s*\u062d\u0636\u0648\u0631|\u0628\u0647\s*\u0647\u0645\u0631\u0627\u0647"
+_FEAT_BRACKET_RE = re.compile(
+    r"[\(\[\{]\s*(?:%s)\b\.?[^\)\]\}]*[\)\]\}]" % _FEAT_WORDS, re.IGNORECASE)
+_FEAT_TRAIL_RE = re.compile(
+    r"\s*[-\u2013,]?\s*\b(?:%s)\b\.?\s+.*$" % _FEAT_WORDS, re.IGNORECASE)
+
+# Separators between collaborating artists. Deliberately excludes "and" and a
+# bare "x": splitting on those would tear apart real band names.
+_ARTIST_SPLIT_RE = re.compile(
+    r"\s*(?:&|,|;|/|\+|\bvs\.?\b|\b(?:%s)\b\.?)\s*" % _FEAT_WORDS,
+    re.IGNORECASE)
+
 _PUNCT_RE = re.compile(r"[^\w\s\u0600-\u06ff]+", re.UNICODE)
 _SPACE_RE = re.compile(r"\s+")
 
@@ -104,6 +120,37 @@ def strip_copy_marks(stem: str) -> str:
 
 def looks_like_copy(stem: str) -> bool:
     return bool(_COPY_RE.search(stem)) or "copy" in stem.casefold() or "کپی" in stem
+
+
+def strip_featuring(title: str) -> str:
+    """Drop the guest-artist credit from a title.
+
+    "Ta Yeja (feat. Daniyal & Mahyar)" and "Ta Yeja (Ft. Daniyal & Mahyar)"
+    both become "Ta Yeja".
+    """
+    if not title:
+        return ""
+    out = _FEAT_BRACKET_RE.sub(" ", title)
+    out = _FEAT_TRAIL_RE.sub("", out)
+    return out.strip(" -\u2013_.")
+
+
+def core_title_key(title: str) -> str:
+    """Comparison key for a title with any guest credit removed."""
+    return normalize_text(strip_featuring(title))
+
+
+def artist_tokens(artist: str) -> frozenset:
+    """The set of people credited, so subsets can be compared.
+
+    One file crediting "Shayea" and another "Shayea & Daniyal & Mahyar" are
+    the same recording; a subset test says so, where string equality cannot.
+    """
+    if not artist:
+        return frozenset()
+    parts = _ARTIST_SPLIT_RE.split(artist)
+    tokens = {normalize_text(p) for p in parts}
+    return frozenset(t for t in tokens if len(t) >= 2)
 
 
 def name_key(filename: str) -> str:
